@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cwchar>
 #include <cmath>
+#include <vector>
 
 #include "nifti1.h"
 
@@ -183,7 +184,7 @@ int main (int argc, char* argv[])
   if (!nd2)
     error ("cannot open input nd2 file \"" + str(argv[1]) + "\": " + strerror());
 
-/*
+
   { // check if output file already exists:
     std::ifstream nii (argv[2]);
     if (nii) {
@@ -191,7 +192,7 @@ int main (int argc, char* argv[])
       std::string response;
       std::cin >> response;
       if (response != "y" && response != "Y") {
-        std::cerr << "aborting\n";
+        std::cerr << "aborted\n";
         return 0;
       }
     }
@@ -199,24 +200,28 @@ int main (int argc, char* argv[])
 
   // open output file:
   std::ofstream nii (argv[2], std::ios_base::binary | std::ios_base::trunc);
-*/
+
+
+
+
+
   // parse input file:
 
   read_section_header(nd2, 0);
 
-
   size_t width (0), height (0);
   int bpp (0), components (0);
+  std::string description;
 
 
   size_t offset = 4096;
-  size_t slices = 0;
+  std::vector<size_t> slice_offsets;
   while (nd2.good()) {
     Section section = read_section_header(nd2, offset);
     if (dump_info)
       std::cout << section;
     if (section.name.substr (0, 13) == "ImageDataSeq|") 
-      ++slices;
+      slice_offsets.push_back (section.data);
     else {
       nd2.seekg (section.data);
       while (nd2.tellg() < ssize_t(section.next) && nd2.good()) {
@@ -232,16 +237,91 @@ int main (int argc, char* argv[])
           bpp = to<int> (entry.second);
         else if (entry.first == "uiVirtualComponents")
           components = to<int> (entry.second);
+        else if (entry.first == "sDescription")
+          description = entry.second;
       }
     }
 
     offset = section.next;
     offset = 4096 * std::ceil(offset / 4096.0);
   }
+  description.resize (80, '\0');
 
-  VAR (slices);
+  std::cout << "found " << slice_offsets.size() << " slices of size " << width << " x " << height << ", with " << components << " channels and " << bpp << " bits per pixel" << std::endl;
 
-  std::cout << "found " << slices << " slices of size " << width << " x " << height << ", with " << components << " channels and " << bpp << " bits per pixel" << std::endl;
+
+
+
+
+  // prepare NIfTI-1 header:
+  nifti_1_header H;
+  H.sizeof_hdr = 348;
+  memcpy (H.data_type, "confocal\0\0\0\0", 10); 
+  memcpy (H.db_name, "convert: nd2tonii\0\0", 18);
+  H.extents = 16384;
+  H.session_error = 0; 
+  H.regular = 'r';    
+  H.dim_info = 0; 
+
+  H.dim[0] = 4;
+  H.dim[1] = width;
+  H.dim[2] = height;
+  H.dim[3] = slice_offsets.size();
+  H.dim[4] = components;
+  H.dim[5] = H.dim[6] = H.dim[7] = 0;
+
+  H.intent_p1 = H.intent_p2 = H.intent_p3 = 0.0;
+  H.intent_code = NIFTI_INTENT_NONE;
+  H.datatype = bpp == 16 ? DT_UINT16 : DT_UINT8;   
+  H.bitpix = bpp;    
+  H.pixdim[0] = 1.0;
+  H.pixdim[1] = H.pixdim[2] = 1.0; H.pixdim[3] = 4.0;
+  H.pixdim[4] = H.pixdim[5] = H.pixdim[6] = H.pixdim[7] = 0.0;
+  H.vox_offset = 352.0;
+  H.scl_slope = 1.0;
+  H.scl_inter = 0.0;
+
+  H.slice_start = H.slice_end = H.slice_code = 0;
+  H.xyzt_units =  NIFTI_UNITS_MM | NIFTI_UNITS_SEC;
+  H.cal_max = H.cal_min = H.slice_duration = H.toffset = 0.0;
+  H.glmax = H.glmin = 0;
+
+  memcpy (H.descrip, description.c_str(), 80);
+  memset (H.aux_file, 0, 24);
+
+  H.qform_code = H.sform_code = 1;
+  H.quatern_b = H.quatern_c = H.quatern_d = 0.0;
+  H.qoffset_x = H.srow_x[3] = -H.pixdim[1]*H.dim[1]/2.0;
+  H.qoffset_y = H.srow_y[3] = -H.pixdim[2]*H.dim[2]/2.0;
+  H.qoffset_z = H.srow_z[3] = -H.pixdim[3]*H.dim[3]/2.0;
+
+  H.srow_x[0] = H.srow_y[1] = H.srow_z[2] = 1.0;
+  H.srow_x[1] = H.srow_x[2] = H.srow_y[0] = H.srow_y[2] = H.srow_z[0] = H.srow_z[1] = 0.0;
+
+  memcpy (H.intent_name, "confocal microscopy", 16);
+  memcpy (H.magic, "n+1\0", 4);
+
+
+
+  // write-out:
+  nii.write (reinterpret_cast<char*>(&H), sizeof (H));
+  nii.write ("\0\0\0\0", 4);
+
+  const size_t numel = width * height;
+  uint16_t* in = new uint16_t [numel*components];
+  uint16_t* out = new uint16_t [numel];
+  for (int current_component = 0; current_component < components; ++current_component) {
+    nd2.clear();
+    for (size_t n = 0; n < slice_offsets.size(); ++n) {
+      nd2.seekg (slice_offsets[n]);
+      nd2.read (reinterpret_cast<char*>(in), numel*components*sizeof(uint16_t));
+      for (size_t i = 0; i < numel; ++i)
+        out[i] = in[components*i+current_component];
+      nii.write (reinterpret_cast<char*>(out), numel*sizeof(uint16_t));
+    }
+  }
+
+
 }
 
 

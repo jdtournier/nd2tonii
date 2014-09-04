@@ -180,15 +180,15 @@ int main (int argc, char* argv[])
     error ("usage: nd2tonii [-info] nd2file niftifile");
 
   // open input file:
-  std::ifstream nd2 (argv[1]);
+  std::ifstream nd2 (file[0]);
   if (!nd2)
-    error ("cannot open input nd2 file \"" + str(argv[1]) + "\": " + strerror());
+    error ("cannot open input nd2 file \"" + str(file[0]) + "\": " + strerror());
 
 
   { // check if output file already exists:
-    std::ifstream nii (argv[2]);
+    std::ifstream nii (file[1]);
     if (nii) {
-      std::cerr << "WARNING: output file \"" << argv[2] << "\" already exists - overwrite (y/N)? ";
+      std::cerr << "WARNING: output file \"" << file[1] << "\" already exists - overwrite (y/N)? ";
       std::string response;
       std::cin >> response;
       if (response != "y" && response != "Y") {
@@ -199,7 +199,7 @@ int main (int argc, char* argv[])
   }
 
   // open output file:
-  std::ofstream nii (argv[2], std::ios_base::binary | std::ios_base::trunc);
+  std::ofstream nii (file[1], std::ios_base::binary | std::ios_base::trunc);
 
 
 

@@ -211,6 +211,7 @@ int main (int argc, char* argv[])
 
   size_t width (0), height (0);
   int bpp (0), components (0);
+  float pixsize (1.0), slice_thickness (1.0);
   std::string description;
 
 
@@ -239,6 +240,10 @@ int main (int argc, char* argv[])
           components = to<int> (entry.second);
         else if (entry.first == "sDescription")
           description = entry.second;
+        else if (entry.first == "dCalibration")
+          pixsize = to<float> (entry.second);
+        else if (entry.first == "dZStep")
+          slice_thickness = to<float> (entry.second);
       }
     }
 
@@ -247,7 +252,9 @@ int main (int argc, char* argv[])
   }
   description.resize (80, '\0');
 
-  std::cout << "found " << slice_offsets.size() << " slices of size " << width << " x " << height << ", with " << components << " channels and " << bpp << " bits per pixel" << std::endl;
+  std::cout << "found " << slice_offsets.size() << " slices of size " << width << " x " << height << std::endl 
+    << "  with " << components << " channels and " << bpp << " bits per pixel" << std::endl 
+    << "  pixel size: " << pixsize << "um, slice thickness: " << slice_thickness << "um" << std::endl;
 
 
 
@@ -275,7 +282,7 @@ int main (int argc, char* argv[])
   H.datatype = bpp == 16 ? DT_UINT16 : DT_UINT8;   
   H.bitpix = bpp;    
   H.pixdim[0] = 1.0;
-  H.pixdim[1] = H.pixdim[2] = 1.0; H.pixdim[3] = 4.0;
+  H.pixdim[1] = H.pixdim[2] = pixsize; H.pixdim[3] = slice_thickness;
   H.pixdim[4] = H.pixdim[5] = H.pixdim[6] = H.pixdim[7] = 0.0;
   H.vox_offset = 352.0;
   H.scl_slope = 1.0;

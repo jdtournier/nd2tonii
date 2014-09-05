@@ -72,6 +72,8 @@ inline Section read_section_header (std::ifstream& in, size_t offset)
   in.seekg (offset);
   uint32_t u;
   in.read (reinterpret_cast<char*>(&u), sizeof(u));
+  if (!in.good())
+    return section;
   if (u != 0x0ABECEDA)
     error ("unexpected word at offset " + str(offset) + " - file not in nd2 format?");
 
@@ -203,6 +205,8 @@ int main (int argc, char* argv[])
   std::vector<size_t> slice_offsets;
   while (nd2.good()) {
     Section section = read_section_header(nd2, offset);
+    if (!nd2.good())
+      break;
     if (dump_info)
       std::cout << section;
     if (section.name.substr (0, 13) == "ImageDataSeq|") 

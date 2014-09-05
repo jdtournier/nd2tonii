@@ -161,7 +161,7 @@ int main (int argc, char* argv[])
     std::cout << 
       "nd2tonii : convert nd2 images to NIfTI format\n"
       "Written by J-Donald Tournier (jdtournier@gmail.com)\n"
-      "usage: nd2tonii [-info] nd2file niftifile\n";
+      "usage: nd2tonii [-info] nd2file niftiprefix\n";
     return 0;
   }
 
@@ -177,29 +177,13 @@ int main (int argc, char* argv[])
 
 
   if (filep != file+2) 
-    error ("usage: nd2tonii [-info] nd2file niftifile");
+    error ("usage: nd2tonii [-info] nd2file niftiprefix");
 
   // open input file:
   std::ifstream nd2 (file[0]);
   if (!nd2)
     error ("cannot open input nd2 file \"" + str(file[0]) + "\": " + strerror());
 
-
-  { // check if output file already exists:
-    std::ifstream nii (file[1]);
-    if (nii) {
-      std::cerr << "WARNING: output file \"" << file[1] << "\" already exists - overwrite (y/N)? ";
-      std::string response;
-      std::cin >> response;
-      if (response != "y" && response != "Y") {
-        std::cerr << "aborted\n";
-        return 0;
-      }
-    }
-  }
-
-  // open output file:
-  std::ofstream nii (file[1], std::ios_base::binary | std::ios_base::trunc);
 
 
 
@@ -270,12 +254,11 @@ int main (int argc, char* argv[])
   H.regular = 'r';    
   H.dim_info = 0; 
 
-  H.dim[0] = 4;
+  H.dim[0] = 3;
   H.dim[1] = width;
   H.dim[2] = height;
   H.dim[3] = slice_offsets.size();
-  H.dim[4] = components;
-  H.dim[5] = H.dim[6] = H.dim[7] = 0;
+  H.dim[4] = H.dim[5] = H.dim[6] = H.dim[7] = 0;
 
   H.intent_p1 = H.intent_p2 = H.intent_p3 = 0.0;
   H.intent_code = NIFTI_INTENT_NONE;
@@ -310,14 +293,45 @@ int main (int argc, char* argv[])
 
 
 
-  // write-out:
-  nii.write (reinterpret_cast<char*>(&H), sizeof (H));
-  nii.write ("\0\0\0\0", 4);
 
+
+
+
+  // check output files:
+  std::string existing_files;
+  for (int current_component = 0; current_component < components; ++current_component) {
+    std::string filename = file[1] + str (current_component) + ".nii";
+    // check if output file already exists:
+    std::ifstream check (filename);
+    if (check)
+      existing_files += "\"" + filename + "\" ";
+  }
+
+  if (existing_files.size()) {
+    std::cerr << "WARNING: output files " << existing_files << "already exist - overwrite (y/N)? ";
+    std::string response;
+    std::cin >> response;
+    if (response != "y" && response != "Y") {
+      std::cerr << "aborted\n";
+      return 0;
+    }
+  }
+
+
+
+
+  // write-out:
   const size_t numel = width * height;
   uint16_t* in = new uint16_t [numel*components];
   uint16_t* out = new uint16_t [numel];
   for (int current_component = 0; current_component < components; ++current_component) {
+    std::string filename = file[1] + str (current_component) + ".nii";
+    std::ofstream nii (filename, std::ios_base::binary | std::ios_base::trunc);
+    // write header:
+    nii.write (reinterpret_cast<char*>(&H), sizeof (H));
+    nii.write ("\0\0\0\0", 4);
+
+    // write data:
     nd2.clear();
     for (size_t n = 0; n < slice_offsets.size(); ++n) {
       nd2.seekg (slice_offsets[n]);
@@ -327,8 +341,6 @@ int main (int argc, char* argv[])
       nii.write (reinterpret_cast<char*>(out), numel*sizeof(uint16_t));
     }
   }
-
-
 }
 
 

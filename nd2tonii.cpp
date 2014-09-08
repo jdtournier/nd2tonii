@@ -210,7 +210,7 @@ int main (int argc, char* argv[])
     if (dump_info)
       std::cout << section;
     if (section.name.substr (0, 13) == "ImageDataSeq|") 
-      slice_offsets.push_back (section.data);
+      slice_offsets.push_back (4096 * std::ceil (section.data / 4096.0));
     else {
       nd2.seekg (section.data);
       while (nd2.tellg() < ssize_t(section.next) && nd2.good()) {

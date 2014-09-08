@@ -182,7 +182,7 @@ int main (int argc, char* argv[])
     error ("usage: nd2tonii [-info] nd2file niftiprefix");
 
   // open input file:
-  std::ifstream nd2 (file[0]);
+  std::ifstream nd2 (file[0], std::ios_base::binary);
   if (!nd2)
     error ("cannot open input nd2 file \"" + str(file[0]) + "\": " + strerror());
 
@@ -334,6 +334,7 @@ int main (int argc, char* argv[])
     // write header:
     nii.write (reinterpret_cast<char*>(&H), sizeof (H));
     nii.write ("\0\0\0\0", 4);
+
 
     // write data:
     nd2.clear();

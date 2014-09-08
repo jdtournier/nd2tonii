@@ -291,7 +291,7 @@ int main (int argc, char* argv[])
   H.qoffset_y = H.srow_y[3] = -H.pixdim[2]*H.dim[2]/2.0;
   H.qoffset_z = H.srow_z[3] = -H.pixdim[3]*H.dim[3]/2.0;
 
-  H.srow_x[0] = H.srow_y[1] = H.srow_z[2] = 1.0;
+  H.srow_x[0] = H.srow_y[1] = pixsize; H.srow_z[2] = slice_thickness;
   H.srow_x[1] = H.srow_x[2] = H.srow_y[0] = H.srow_y[2] = H.srow_z[0] = H.srow_z[1] = 0.0;
 
   memcpy (H.intent_name, "confocal microscopy", 16);

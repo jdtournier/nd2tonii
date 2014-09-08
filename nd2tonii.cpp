@@ -252,7 +252,9 @@ int main (int argc, char* argv[])
   nifti_1_header H;
   H.sizeof_hdr = 348;
   memcpy (H.data_type, "confocal\0\0\0\0", 10); 
-  memcpy (H.db_name, "convert: nd2tonii\0\0", 18);
+  std::string db_name (file[0]);
+  db_name.resize (18, '\0');
+  memcpy (H.db_name, db_name.c_str(), 18);
   H.extents = 16384;
   H.session_error = 0; 
   H.regular = 'r';    
